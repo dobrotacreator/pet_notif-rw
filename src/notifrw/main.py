@@ -244,6 +244,9 @@ async def cmd_interval(
         return
 
     new_interval = int(context.args[0])
+    if new_interval < 1:
+        await update.message.reply_text("❌ Минимальный интервал: 1 секунда")
+        return
     context.chat_data["interval"] = new_interval
 
     remove_job_if_exists(str(chat_id), context)
