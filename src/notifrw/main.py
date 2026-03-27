@@ -6,6 +6,8 @@ from urllib.parse import parse_qs, urlparse
 
 import requests
 from bs4 import BeautifulSoup
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -145,3 +147,183 @@ def format_notification(
                 f"💺 {seat.name} — {seat.count} мест — от {seat.price_byn} BYN"
             )
     return "\n".join(lines)
+
+
+def remove_job_if_exists(name: str, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    jobs = context.job_queue.get_jobs_by_name(name)
+    for job in jobs:
+        job.schedule_removal()
+    return bool(jobs)
+
+
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = (
+        "🚂 Монитор билетов pass.rw.by\n\n"
+        "Команды:\n"
+        "/watch <url> [поезда] — начать мониторинг\n"
+        "/stop — остановить\n"
+        "/interval <сек> — изменить интервал\n"
+        "/status — текущий статус"
+    )
+    await update.message.reply_text(text)
+
+
+async def cmd_watch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not context.args:
+        await update.message.reply_text(
+            "❌ Использование: /watch <url> [поезд1,поезд2,...]"
+        )
+        return
+
+    url = context.args[0]
+    info = parse_watch_url(url)
+    if not info:
+        await update.message.reply_text(
+            "❌ Неверная ссылка. Скопируйте URL из pass.rw.by"
+        )
+        return
+
+    train_filter = None
+    if len(context.args) > 1:
+        train_filter = set(context.args[1].split(","))
+
+    chat_id = update.effective_chat.id
+    interval = context.chat_data.get("interval", DEFAULT_INTERVAL)
+
+    context.chat_data.update(
+        {
+            "url": info["url"],
+            "from": info["from"],
+            "to": info["to"],
+            "date": info["date"],
+            "train_filter": train_filter,
+            "notified_trains": set(),
+            "consecutive_errors": 0,
+            "interval": interval,
+        }
+    )
+
+    remove_job_if_exists(str(chat_id), context)
+    context.job_queue.run_repeating(
+        check_job,
+        interval=interval,
+        first=5,
+        chat_id=chat_id,
+        name=str(chat_id),
+    )
+
+    trains_text = (
+        ", ".join(sorted(train_filter)) if train_filter else "Все поезда"
+    )
+    text = (
+        f"✅ Мониторинг запущен (каждые {interval} сек)\n"
+        f"📍 {info['from']} → {info['to']}, {info['date']}\n"
+        f"🔍 Поезда: {trains_text}"
+    )
+    await update.message.reply_text(text)
+
+
+async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = update.effective_chat.id
+    removed = remove_job_if_exists(str(chat_id), context)
+    context.chat_data.clear()
+    text = "⏹ Мониторинг остановлен" if removed else "ℹ️ Нет активного мониторинга"
+    await update.message.reply_text(text)
+
+
+async def cmd_interval(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    chat_id = update.effective_chat.id
+    if "url" not in context.chat_data:
+        await update.message.reply_text("❌ Нет активного мониторинга")
+        return
+
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text("❌ Использование: /interval <секунды>")
+        return
+
+    new_interval = int(context.args[0])
+    context.chat_data["interval"] = new_interval
+
+    remove_job_if_exists(str(chat_id), context)
+    context.job_queue.run_repeating(
+        check_job,
+        interval=new_interval,
+        first=new_interval,
+        chat_id=chat_id,
+        name=str(chat_id),
+    )
+
+    await update.message.reply_text(f"✅ Интервал изменён на {new_interval} сек")
+
+
+async def cmd_status(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> None:
+    if "url" not in context.chat_data:
+        await update.message.reply_text("ℹ️ Нет активного мониторинга")
+        return
+
+    data = context.chat_data
+    trains_text = (
+        ", ".join(sorted(data["train_filter"]))
+        if data.get("train_filter")
+        else "Все"
+    )
+    text = (
+        f"📊 Статус мониторинга\n"
+        f"📍 {data['from']} → {data['to']}, {data['date']}\n"
+        f"🔍 Поезда: {trains_text}\n"
+        f"⏱ Интервал: {data['interval']} сек"
+    )
+    await update.message.reply_text(text)
+
+
+async def check_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    chat_id = context.job.chat_id
+    data = context.chat_data
+
+    url = data.get("url")
+    if not url:
+        return
+
+    try:
+        html = await asyncio.to_thread(fetch_page, url)
+        data["consecutive_errors"] = 0
+    except Exception as e:
+        data["consecutive_errors"] = data.get("consecutive_errors", 0) + 1
+        logger.error(f"Ошибка при запросе: {e}")
+        if data["consecutive_errors"] == 5:
+            await context.bot.send_message(
+                chat_id=chat_id, text=f"⚠️ Не удалось проверить: {e}"
+            )
+        return
+
+    trains = parse_trains(html, data.get("train_filter"))
+    notified = data.get("notified_trains", set())
+    new_trains, updated_notified = filter_new_trains(trains, notified)
+    data["notified_trains"] = updated_notified
+
+    if new_trains:
+        msg = format_notification(new_trains, data["from"], data["to"])
+        await context.bot.send_message(chat_id=chat_id, text=msg)
+    else:
+        logger.info("Мест нет на отслеживаемые поезда.")
+
+
+def main() -> None:
+    token = os.environ["TELEGRAM_TOKEN"]
+    app = Application.builder().token(token).build()
+
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("watch", cmd_watch))
+    app.add_handler(CommandHandler("stop", cmd_stop))
+    app.add_handler(CommandHandler("interval", cmd_interval))
+    app.add_handler(CommandHandler("status", cmd_status))
+
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+
+if __name__ == "__main__":
+    main()
