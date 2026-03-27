@@ -13,6 +13,7 @@ dependencies = [
     "requests>=2.32.3,<3",
     "beautifulsoup4>=4.12.3,<5",
     "python-telegram-bot[job-queue]>=21.9,<22",
+    "python-dotenv>=1.0",
 ]
 
 [dependency-groups]

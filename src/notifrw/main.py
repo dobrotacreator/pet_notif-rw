@@ -4,6 +4,10 @@ import os
 from dataclasses import dataclass
 from urllib.parse import parse_qs, urlparse
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import requests
 from bs4 import BeautifulSoup
 from telegram import Update
@@ -163,7 +167,9 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/watch <url> [поезда] — начать мониторинг\n"
         "/stop — остановить\n"
         "/interval <сек> — изменить интервал\n"
-        "/status — текущий статус"
+        "/status — текущий статус\n\n"
+        "Пример:\n"
+        "/watch https://pass.rw.by/ru/route/?from=... 747Б,709Б"
     )
     await update.message.reply_text(text)
 
@@ -171,7 +177,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_watch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.args:
         await update.message.reply_text(
-            "❌ Использование: /watch <url> [поезд1,поезд2,...]"
+            "❌ Использование:\n/watch <url> 747Б,709Б\n\nСкопируйте ссылку из pass.rw.by"
         )
         return
 
