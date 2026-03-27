@@ -36,7 +36,7 @@ class TrainInfo:
 
 
 def fetch_page(url: str) -> str:
-    response = requests.get(url, headers={"User-Agent": USER_AGENT})
+    response = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=30)
     response.raise_for_status()
     return response.text
 
