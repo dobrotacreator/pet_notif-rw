@@ -98,3 +98,21 @@ def parse_trains(
             )
 
     return trains
+
+
+def parse_watch_url(url: str) -> dict | None:
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return None
+    if parsed.hostname != "pass.rw.by":
+        return None
+    params = parse_qs(parsed.query)
+    if "from" not in params or "to" not in params:
+        return None
+    return {
+        "url": url,
+        "from": params["from"][0],
+        "to": params["to"][0],
+        "date": params.get("date", [""])[0],
+    }

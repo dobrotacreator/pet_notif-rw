@@ -1,4 +1,4 @@
-from notifrw.main import SeatClass, TrainInfo, parse_trains
+from notifrw.main import SeatClass, TrainInfo, parse_trains, parse_watch_url
 
 
 FIXTURE_HTML = """
@@ -139,3 +139,31 @@ class TestParseTrains:
         trains = parse_trains(FIXTURE_HTML)
         train = next(t for t in trains if t.number == "755Б")
         assert train.seats[0].price_byn == "14,06"
+
+
+class TestParseWatchUrl:
+    def test_valid_url_with_all_params(self):
+        url = (
+            "https://pass.rw.by/ru/route/"
+            "?from=Гомель&from_exp=2100100&to=Минск&to_exp=2100000"
+            "&date=2026-03-29&front_date=29+мар.+2026"
+        )
+        result = parse_watch_url(url)
+        assert result == {
+            "url": url,
+            "from": "Гомель",
+            "to": "Минск",
+            "date": "2026-03-29",
+        }
+
+    def test_invalid_host_returns_none(self):
+        assert parse_watch_url("https://example.com/route?from=A&to=B") is None
+
+    def test_missing_from_returns_none(self):
+        assert parse_watch_url("https://pass.rw.by/ru/route/?to=Минск") is None
+
+    def test_missing_to_returns_none(self):
+        assert parse_watch_url("https://pass.rw.by/ru/route/?from=Гомель") is None
+
+    def test_garbage_string_returns_none(self):
+        assert parse_watch_url("not a url") is None
