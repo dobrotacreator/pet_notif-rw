@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import logging
 import os
@@ -60,9 +58,14 @@ def parse_trains(
         if train_filter and number not in train_filter:
             continue
 
-        departure = row.find("div", class_="train-from-time").text.strip()
-        arrival = row.find("div", class_="train-to-time").text.strip()
-        duration = row.find("div", class_="train-duration-time").text.strip()
+        dep_el = row.find("div", class_="train-from-time")
+        arr_el = row.find("div", class_="train-to-time")
+        dur_el = row.find("div", class_="train-duration-time")
+        if not dep_el or not arr_el or not dur_el:
+            continue
+        departure = dep_el.text.strip()
+        arrival = arr_el.text.strip()
+        duration = dur_el.text.strip()
 
         seats = []
         for item in row.find_all("div", class_="sch-table__t-item"):
