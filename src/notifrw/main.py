@@ -116,3 +116,13 @@ def parse_watch_url(url: str) -> dict | None:
         "to": params["to"][0],
         "date": params.get("date", [""])[0],
     }
+
+
+def filter_new_trains(
+    trains: list[TrainInfo], notified: set[str]
+) -> tuple[list[TrainInfo], set[str]]:
+    current = {t.number for t in trains}
+    updated = notified & current
+    new = [t for t in trains if t.number not in notified]
+    updated.update(t.number for t in new)
+    return new, updated

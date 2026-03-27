@@ -1,4 +1,10 @@
-from notifrw.main import SeatClass, TrainInfo, parse_trains, parse_watch_url
+from notifrw.main import (
+    SeatClass,
+    TrainInfo,
+    filter_new_trains,
+    parse_trains,
+    parse_watch_url,
+)
 
 
 FIXTURE_HTML = """
@@ -167,3 +173,44 @@ class TestParseWatchUrl:
 
     def test_garbage_string_returns_none(self):
         assert parse_watch_url("not a url") is None
+
+
+class TestFilterNewTrains:
+    def test_first_check_all_trains_are_new(self):
+        trains = [
+            TrainInfo("689Б", "19:37", "00:13", "4 ч", []),
+            TrainInfo("755Б", "04:41", "07:53", "3 ч", []),
+        ]
+        new, notified = filter_new_trains(trains, set())
+        assert len(new) == 2
+        assert notified == {"689Б", "755Б"}
+
+    def test_already_notified_trains_skipped(self):
+        trains = [TrainInfo("689Б", "19:37", "00:13", "4 ч", [])]
+        new, notified = filter_new_trains(trains, {"689Б"})
+        assert len(new) == 0
+        assert notified == {"689Б"}
+
+    def test_disappeared_train_removed_from_notified(self):
+        new, notified = filter_new_trains([], {"689Б"})
+        assert len(new) == 0
+        assert notified == set()
+
+    def test_reappeared_train_notified_again(self):
+        _, notified = filter_new_trains([], {"689Б"})
+        assert notified == set()
+        trains = [TrainInfo("689Б", "19:37", "00:13", "4 ч", [])]
+        new, notified = filter_new_trains(trains, notified)
+        assert len(new) == 1
+        assert new[0].number == "689Б"
+        assert notified == {"689Б"}
+
+    def test_mix_of_new_and_existing(self):
+        trains = [
+            TrainInfo("689Б", "19:37", "00:13", "4 ч", []),
+            TrainInfo("755Б", "04:41", "07:53", "3 ч", []),
+        ]
+        new, notified = filter_new_trains(trains, {"689Б"})
+        assert len(new) == 1
+        assert new[0].number == "755Б"
+        assert notified == {"689Б", "755Б"}
