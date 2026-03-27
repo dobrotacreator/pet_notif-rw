@@ -126,3 +126,19 @@ def filter_new_trains(
     new = [t for t in trains if t.number not in notified]
     updated.update(t.number for t in new)
     return new, updated
+
+
+def format_notification(
+    trains: list[TrainInfo], from_city: str, to_city: str
+) -> str:
+    lines = ["🚂 Места появились!"]
+    for train in trains:
+        lines.append("")
+        lines.append(f"🔹 Поезд {train.number}")
+        lines.append(f"📍 {from_city} → {to_city}")
+        lines.append(f"🕐 {train.departure} → {train.arrival} ({train.duration})")
+        for seat in train.seats:
+            lines.append(
+                f"💺 {seat.name} — {seat.count} мест — от {seat.price_byn} BYN"
+            )
+    return "\n".join(lines)

@@ -2,6 +2,7 @@ from notifrw.main import (
     SeatClass,
     TrainInfo,
     filter_new_trains,
+    format_notification,
     parse_trains,
     parse_watch_url,
 )
@@ -214,3 +215,42 @@ class TestFilterNewTrains:
         assert len(new) == 1
         assert new[0].number == "755Б"
         assert notified == {"689Б", "755Б"}
+
+
+class TestFormatNotification:
+    def test_single_train(self):
+        trains = [
+            TrainInfo(
+                number="689Б",
+                departure="19:37",
+                arrival="00:13",
+                duration="4 ч 36 мин",
+                seats=[
+                    SeatClass("Плацкартный", 148, "17,20"),
+                    SeatClass("Купейный", 53, "23,82"),
+                ],
+            )
+        ]
+        result = format_notification(trains, "Гомель", "Минск")
+        assert "🚂 Места появились!" in result
+        assert "🔹 Поезд 689Б" in result
+        assert "📍 Гомель → Минск" in result
+        assert "🕐 19:37 → 00:13 (4 ч 36 мин)" in result
+        assert "💺 Плацкартный — 148 мест — от 17,20 BYN" in result
+        assert "💺 Купейный — 53 мест — от 23,82 BYN" in result
+
+    def test_multiple_trains(self):
+        trains = [
+            TrainInfo(
+                "689Б", "19:37", "00:13", "4 ч 36 мин",
+                [SeatClass("Купейный", 53, "23,82")],
+            ),
+            TrainInfo(
+                "621Б", "22:10", "05:35", "7 ч 25 мин",
+                [SeatClass("Сидячий", 10, "14,63")],
+            ),
+        ]
+        result = format_notification(trains, "Гомель", "Минск")
+        assert "🔹 Поезд 689Б" in result
+        assert "🔹 Поезд 621Б" in result
+        assert result.index("689Б") < result.index("621Б")
