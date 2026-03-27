@@ -1,17 +1,23 @@
-[tool.poetry]
+[project]
 name = "notifrw"
 version = "0.1.0"
 description = ""
-authors = ["Igor Pavlyukovets <igor.p.i@yandex.ru>"]
+requires-python = ">=3.13,<4"
 readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+    "requests>=2.32.3,<3",
+    "beautifulsoup4>=4.12.3,<5",
+    "python-telegram-bot[job-queue]>=21.9,<22",
+]
 
-[tool.poetry.dependencies]
-python = "^3.13"
-requests = "^2.32.3"
-beautifulsoup4 = "^4.12.3"
-python-telegram-bot = "^21.9"
-
+[dependency-groups]
+dev = ["pytest>=8.0"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.10.4,<0.11.0"]
+build-backend = "uv_build"
