@@ -238,6 +238,21 @@ class TestFormatNotification:
         assert "🕐 19:37 → 00:13 (4 ч 36 мин)" in result
         assert "💺 Плацкартный — 148 мест — от 17,20 BYN" in result
         assert "💺 Купейный — 53 мест — от 23,82 BYN" in result
+        assert "<a href=" not in result  # no link without url
+
+    def test_single_train_with_url(self):
+        trains = [
+            TrainInfo(
+                number="689Б",
+                departure="19:37",
+                arrival="00:13",
+                duration="4 ч 36 мин",
+                seats=[SeatClass("Плацкартный", 148, "17,20")],
+            )
+        ]
+        url = "https://pass.rw.by/ru/route/?from=Гомель&to=Минск&date=2026-04-10"
+        result = format_notification(trains, "Гомель", "Минск", url)
+        assert f'<a href="{url}">Открыть на сайте</a>' in result
 
     def test_multiple_trains(self):
         trains = [

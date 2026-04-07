@@ -138,7 +138,7 @@ def filter_new_trains(
 
 
 def format_notification(
-    trains: list[TrainInfo], from_city: str, to_city: str
+    trains: list[TrainInfo], from_city: str, to_city: str, url: str = ""
 ) -> str:
     lines = ["🚂 Места появились!"]
     for train in trains:
@@ -150,6 +150,9 @@ def format_notification(
             lines.append(
                 f"💺 {seat.name} — {seat.count} мест — от {seat.price_byn} BYN"
             )
+    if url:
+        lines.append("")
+        lines.append(f'🔗 <a href="{url}">Открыть на сайте</a>')
     return "\n".join(lines)
 
 
@@ -315,8 +318,10 @@ async def check_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     data["notified_trains"] = updated_notified
 
     if new_trains:
-        msg = format_notification(new_trains, data["from"], data["to"])
-        await context.bot.send_message(chat_id=chat_id, text=msg)
+        msg = format_notification(new_trains, data["from"], data["to"], url)
+        await context.bot.send_message(
+            chat_id=chat_id, text=msg, parse_mode="HTML"
+        )
     else:
         logger.info("Мест нет на отслеживаемые поезда.")
 
